@@ -3,6 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import { useKeyboardControls } from "@react-three/drei";
 import { useState, useEffect, useRef } from "react";
 import * as THREE from "three";
+import useGame from "./stores/useGame";
 
 
 
@@ -17,6 +18,11 @@ export default function Player()
     const [ smoothedCameraPosition ] = useState(new THREE.Vector3(10, 10, 10))
     const [ smoothedCameraTarget ] = useState(new THREE.Vector3())
 
+    const start = useGame((state) => state.start)
+    const end = useGame((state) => state.end)
+    const restart = useGame((state) => state.restart)
+    const blocksCount = useGame((state) => state.blocksCount)
+
     const jump = () =>
     {
         const origin = body.current.translation()
@@ -29,8 +35,27 @@ export default function Player()
             body.current.applyImpulse({ x: 0, y: 0.5, z: 0 })
     }
 
+    const reset = () =>
+    {
+        body.current.setTranslation({ x: 0, y: 1, z: 0 })
+        body.current.setLinvel({ x: 0, y: 0, z: 0 })
+        body.current.setAngvel({ x: 0, y: 0, z: 0 })
+    }
+
+
+
     useEffect(() =>
     {
+        const unsubscribeReset = useGame.subscribe(
+            (state) => state.phase,
+            (value) =>
+            {
+                if(value === 'ready')
+                    reset()
+            }
+        )
+
+
         const unsuscribeJump = subscribeKeys(
            (state) => state.jump,
            (value) => 
@@ -40,9 +65,18 @@ export default function Player()
            }
         )
 
+        const unsubscrobeAny = subscribeKeys(
+            () =>
+            {
+                start()
+            }
+        )
+
         return () => 
         {
-        unsuscribeJump()
+            unsubscribeReset()
+            unsuscribeJump()
+            unsubscrobeAny()
         }
     }, [])
 
@@ -102,6 +136,12 @@ export default function Player()
 
         state.camera.position.copy(smoothedCameraPosition)
         state.camera.lookAt(smoothedCameraTarget)
+
+        if (bodyPosition.z < - (blocksCount * 4 + 2))
+            end()
+
+        if (bodyPosition.y < - 4)
+            restart()
 
 
     })
